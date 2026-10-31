@@ -1,0 +1,93 @@
+{% extends 'base.html' %}
+{% block title %}Flight planner · SkyRoute{% endblock %}
+{% block content %}
+<section class="page-heading">
+  <div>
+    <div class="eyebrow"><span class="eyebrow-dot"></span> YOUR PERSONAL ROUTE FINDER</div>
+    <h1>Where would you like to <span>fly?</span></h1>
+    <p>Choose two airports. We’ll find the route with the lowest total flight time.</p>
+  </div>
+  <div class="algorithm-pill"><span class="pulse-dot"></span> DIJKSTRA ALGORITHM <small>ACTIVE</small></div>
+</section>
+
+<section class="planner-grid">
+  <div class="search-card panel">
+    <div class="panel-heading"><div><span class="step-label">01 / PLAN YOUR JOURNEY</span><h2>Choose your airports</h2></div><span class="plane-icon">✈</span></div>
+    <form method="POST" action="{{ url_for('index') }}" class="route-form">
+      <div class="airport-field">
+        <label for="source">FROM</label>
+        <div class="select-wrap"><span class="field-icon">⌖</span><select id="source" name="source" required>
+          {% for code, city in airports.items() %}<option value="{{ code }}" {% if source == code %}selected{% endif %}>{{ city }} ({{ code }})</option>{% endfor %}
+        </select></div>
+      </div>
+      <div class="route-connector"><span></span><i>↓</i><span></span></div>
+      <div class="airport-field">
+        <label for="destination">TO</label>
+        <div class="select-wrap"><span class="field-icon destination-icon">◎</span><select id="destination" name="destination" required>
+          {% for code, city in airports.items() %}<option value="{{ code }}" {% if destination == code %}selected{% endif %}>{{ city }} ({{ code }})</option>{% endfor %}
+        </select></div>
+      </div>
+      <button type="button" class="swap-button" id="swap-airports" aria-label="Swap airports">⇅ Swap airports</button>
+      <button type="submit" class="button button-primary find-button">Find shortest route <span>→</span></button>
+    </form>
+    <div class="search-note"><span>ⓘ</span> Results use sample flight durations, not live schedules.</div>
+  </div>
+  <aside class="info-card panel">
+    <span class="step-label">THE NETWORK</span>
+    <h3>Small network.<br><span>Smart decisions.</span></h3>
+    <p>Airports are vertices. Direct flights are weighted, directed edges.</p>
+    <div class="network-stats"><div><strong>07</strong><small>Airports</small></div><div><strong>15</strong><small>Flights</small></div><div><strong>≥0</strong><small>Edge weights</small></div></div>
+    <div class="network-line"><span class="network-node"></span><span class="network-dash"></span><span class="network-node active-node"></span><span class="network-dash"></span><span class="network-node"></span><span class="network-dash short-dash"></span><span class="network-node"></span></div>
+    <div class="network-codes"><span>DEL</span><span>HYD</span><span>BLR</span></div>
+  </aside>
+</section>
+
+{% if result %}
+<section class="result-section">
+  <div class="result-title-row"><div><div class="eyebrow"><span class="eyebrow-dot"></span> ROUTE CALCULATED</div><h2>Your shortest route</h2></div><span class="result-tag">OPTIMAL PATH FOUND ✓</span></div>
+  <div class="result-card panel">
+    <div class="result-summary">
+      <div><span class="summary-label">MINIMUM TOTAL FLIGHT TIME</span><div class="time-value">{{ '%.1f'|format(result.distance) }} <small>hours</small></div><p>From {{ airports[source] }} to {{ airports[destination] }}</p></div>
+      <div class="summary-side"><span class="summary-label">AIRPORTS ON ROUTE</span><strong>{{ result.path|length }}</strong><small>{{ result.legs|length }} direct flight leg(s)</small></div>
+    </div>
+    <div class="route-visual">
+      {% for code in result.path %}
+      <div class="route-stop"><div class="stop-dot {% if loop.first %}start-dot{% elif loop.last %}end-dot{% endif %}">{% if loop.first %}A{% elif loop.last %}B{% else %}·{% endif %}</div><strong>{{ code }}</strong><small>{{ airports[code] }}</small></div>
+      {% if not loop.last %}<div class="route-segment"><span></span><small>{{ '%.1f'|format(result.legs[loop.index0].hours) }} h</small></div>{% endif %}
+      {% endfor %}
+    </div>
+    <div class="leg-list">
+      {% for leg in result.legs %}
+      <div class="leg-row"><span class="leg-number">0{{ loop.index }}</span><span class="leg-route"><strong>{{ leg.from_city }} <small>({{ leg.from }})</small></strong><span>to</span><strong>{{ leg.to_city }} <small>({{ leg.to }})</small></strong></span><b>{{ '%.1f'|format(leg.hours) }} h</b></div>
+      {% endfor %}
+    </div>
+    <div class="result-footnote"><span>✓</span> Shortest path confirmed using Dijkstra’s algorithm. Flight time only; layovers are excluded.</div>
+  </div>
+  <div class="trace-card panel">
+    <div class="trace-heading"><div><span class="step-label">ALGORITHM EXPLAINED</span><h3>How the result was reached</h3></div><span class="trace-count">{{ result.settled_order|length }} airports settled</span></div>
+    <p class="trace-copy">Dijkstra repeatedly selects the unvisited airport with the smallest known distance, then updates its neighbours when a shorter route is found.</p>
+    <div class="settled-list"><span class="settled-label">SETTLED ORDER</span>{% for code in result.settled_order %}<span class="settled-chip">{{ code }}</span>{% if not loop.last %}<span class="settled-arrow">→</span>{% endif %}{% endfor %}</div>
+  </div>
+</section>
+{% endif %}
+
+<section class="network-section panel">
+  <div class="network-section-heading"><div><span class="step-label">REFERENCE DATA</span><h2>Available direct flights</h2></div><span class="data-badge">SAMPLE NETWORK · 7 AIRPORTS</span></div>
+  <div class="table-wrap"><table><thead><tr><th>FROM AIRPORT</th><th>DIRECT CONNECTIONS</th></tr></thead><tbody>
+  {% for code, connections in graph.items() %}
+  <tr><td><span class="airport-code">{{ code }}</span><span class="airport-city">{{ airports[code] }}</span></td><td>{% if connections %}<div class="connection-list">{% for target, hours in connections.items() %}<span class="connection-chip"><b>{{ target }}</b><small>{{ '%.1f'|format(hours) }} h</small></span>{% endfor %}</div>{% else %}<span class="muted">No outgoing flights listed</span>{% endif %}</td></tr>
+  {% endfor %}
+  </tbody></table></div>
+  <p class="table-note">Connections are directed. A reverse flight exists only when it is separately listed in the sample data.</p>
+</section>
+
+<script>
+  document.getElementById('swap-airports').addEventListener('click', function () {
+    const from = document.getElementById('source');
+    const to = document.getElementById('destination');
+    const temporary = from.value;
+    from.value = to.value;
+    to.value = temporary;
+  });
+</script>
+{% endblock %}
